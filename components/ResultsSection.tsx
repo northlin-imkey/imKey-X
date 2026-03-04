@@ -26,10 +26,23 @@ const LoadingSkeleton: React.FC = () => (
 );
 
 const ResultsSection: React.FC<ResultsSectionProps> = ({ tweetGroups, isLoading, error }) => {
+  const dateRange = tweetGroups.length > 0 
+    ? `${tweetGroups[0].date} - ${tweetGroups[tweetGroups.length - 1].date}`
+    : '';
+
   return (
-    <div className="bg-gray-800 p-6 rounded-xl shadow-lg flex flex-col">
-      <h2 className="text-lg font-semibold mb-4 text-gray-300">2. AI 生成的推文草稿</h2>
-      <div className="flex-grow space-y-4 overflow-y-auto pr-2 -mr-2">
+    <div className="bg-gray-800 p-6 rounded-xl shadow-lg flex flex-col border border-gray-700">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-lg font-semibold text-gray-300">2. AI 生成的推文草稿</h2>
+        {tweetGroups.length > 0 && (
+          <div className="flex items-center gap-2 bg-emerald-900/20 px-3 py-1 rounded-full border border-emerald-500/30">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+            <span className="text-xs font-bold text-emerald-400">{dateRange}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex-grow space-y-6 overflow-y-auto pr-2 -mr-2">
         {isLoading && Array.from({ length: 2 }).map((_, i) => <LoadingSkeleton key={i} />)}
         
         {!isLoading && error && (
@@ -53,7 +66,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ tweetGroups, isLoading,
             <h3 className="text-md font-bold text-blue-400 border-b-2 border-gray-700 pb-2 mb-4 sticky top-0 bg-gray-800 py-2">
               {group.date}
             </h3>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
               {group.tweets.map((tweet, tweetIndex) => (
                 <TweetCard key={tweetIndex} tweet={tweet} />
               ))}
