@@ -105,6 +105,8 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`__dirname: ${__dirname}`);
   });
 }
 
