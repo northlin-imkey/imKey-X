@@ -1,0 +1,5 @@
+{
+  "name": "Remix: imKey 推文產生器",
+  "description": "一個 AI 工具，可以根據每週的 PANNEWS 幣圈大事件，為 imKey 硬件錢包產生結合時事的推文。",
+  "requestFramePermissions": []
+}
