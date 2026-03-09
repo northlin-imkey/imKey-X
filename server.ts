@@ -17,6 +17,12 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const supabase = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
+if (!supabase) {
+  console.warn("Supabase is NOT configured. History features will be disabled.");
+} else {
+  console.log("Supabase initialized successfully.");
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;

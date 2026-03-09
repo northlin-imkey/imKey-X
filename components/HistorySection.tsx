@@ -58,7 +58,13 @@ const HistorySection: React.FC = () => {
         <div className="bg-red-900/20 border border-red-500/50 p-6 rounded-2xl text-red-200 text-center max-w-md">
           <p className="font-bold mb-2">載入失敗</p>
           <p className="text-sm opacity-80 mb-4">
-            {error === 'Supabase not configured' ? '尚未設定 Supabase 環境變數' : error}
+            {error === 'Supabase not configured' ? (
+              <span className="text-yellow-400 font-medium">
+                ⚠️ 尚未偵測到 Supabase 設定。請點擊左側選單的「Settings」&gt;「Environment Variables」新增變數。
+              </span>
+            ) : (
+              <span className="break-all">{error}</span>
+            )}
           </p>
           <button 
             onClick={() => {
@@ -66,25 +72,60 @@ const HistorySection: React.FC = () => {
               setError(null);
               fetchHistory();
             }}
-            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition-colors"
+            className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95"
           >
-            重試
+            立即重試
           </button>
         </div>
-        {error.includes('relation "tweets_history" does not exist') && (
-          <div className="bg-blue-900/20 border border-blue-500/50 p-6 rounded-2xl text-blue-200 text-sm max-w-md">
-            <p className="font-bold mb-2">💡 設定提示</p>
-            <p>看來您的 Supabase 資料庫尚未建立 <code className="bg-blue-900/50 px-1 rounded">tweets_history</code> 資料表。請在 Supabase SQL Editor 執行以下指令：</p>
-            <pre className="bg-black/50 p-3 rounded mt-3 overflow-x-auto text-[10px]">
-{`CREATE TABLE tweets_history (
+        {(error.includes('relation "tweets_history" does not exist') || error === 'Supabase not configured') && (
+          <div className="bg-gray-800 border border-gray-700 p-6 rounded-2xl text-gray-300 text-sm max-w-xl w-full shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <span className="bg-emerald-500/20 text-emerald-400 p-1 rounded">🛠️</span>
+              設定指南
+            </h3>
+            
+            <div className="space-y-6">
+              {error === 'Supabase not configured' ? (
+                <div className="space-y-3">
+                  <p className="text-gray-400">請在 AI Studio 的 <span className="text-white font-bold">Settings</span> 選單中新增以下環境變數：</p>
+                  <ul className="list-disc list-inside space-y-2 text-emerald-400 font-mono text-xs bg-black/30 p-3 rounded-lg">
+                    <li>SUPABASE_URL</li>
+                    <li>SUPABASE_ANON_KEY</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 italic">提示：您可以在 Supabase 專案的 Project Settings &gt; API 頁面找到這些資訊。</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-400">連線成功，但資料庫中缺少資料表。請在 Supabase 的 <span className="text-white font-bold">SQL Editor</span> 執行以下指令：</p>
+                  <div className="relative group">
+                    <pre className="bg-black/80 p-4 rounded-xl overflow-x-auto text-[11px] text-emerald-400 border border-emerald-500/30">
+{`-- 1. 建立推文歷史資料表
+CREATE TABLE IF NOT EXISTS tweets_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   language TEXT,
   tone TEXT,
   content JSONB,
   date_range TEXT
-);`}
-            </pre>
+);
+
+-- 2. 關閉 RLS 以允許前端存取 (或設定 Policy)
+ALTER TABLE tweets_history DISABLE ROW LEVEL SECURITY;`}
+                    </pre>
+                    <button 
+                      onClick={() => {
+                        const sql = `-- 1. 建立推文歷史資料表\nCREATE TABLE IF NOT EXISTS tweets_history (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  language TEXT,\n  tone TEXT,\n  content JSONB,\n  date_range TEXT\n);\n\n-- 2. 關閉 RLS 以允許前端存取 (或設定 Policy)\nALTER TABLE tweets_history DISABLE ROW LEVEL SECURITY;`;
+                        navigator.clipboard.writeText(sql);
+                        alert('SQL 已複製到剪貼簿！');
+                      }}
+                      className="absolute top-2 right-2 px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      複製 SQL
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -93,8 +134,19 @@ const HistorySection: React.FC = () => {
 
   if (history.length === 0) {
     return (
-      <div className="text-center py-20 bg-gray-800/50 rounded-2xl border border-gray-700">
-        <p className="text-gray-400">尚無歷史紀錄</p>
+      <div className="text-center py-20 bg-gray-800/50 rounded-2xl border border-gray-700 flex flex-col items-center">
+        <p className="text-gray-400 mb-4">尚無歷史紀錄</p>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => fetchHistory()}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+          >
+            重新整理
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-6 max-w-xs">
+          提示：產生推文後會自動儲存到這裡。如果已經產生過但仍沒看到，請確認 Supabase 設定是否正確。
+        </p>
       </div>
     );
   }
