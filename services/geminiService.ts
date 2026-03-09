@@ -1,7 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { type DailyTweetGroup, type Language, type Tone } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const getApiKey = () => {
+  try {
+    return process.env.GEMINI_API_KEY || '';
+  } catch {
+    return '';
+  }
+};
 
 const getTweetSchema = (lang: Language) => {
   let langDesc = 'Simplified Chinese';
@@ -96,6 +102,7 @@ export const updateTweetStatus = async (historyId: string, groupIndex: number, t
 };
 
 export const generateTweets = async (imageFile: File, language: Language, tone: Tone): Promise<DailyTweetGroup[]> => {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
   const base64Data = await new Promise<string>((resolve) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
@@ -138,6 +145,7 @@ export const generateTweets = async (imageFile: File, language: Language, tone: 
 };
 
 export const generateCelebrationTweets = async (asset: string, price: string, language: Language, tone: Tone): Promise<DailyTweetGroup[]> => {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
   const textPrompt = `
     The price of ${asset} has just broken through $${price}! 
     Generate 3 distinct celebratory tweet drafts for imKey.

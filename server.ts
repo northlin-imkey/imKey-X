@@ -91,12 +91,28 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    console.log('Using Vite middleware (Development mode)');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
+    
+    // Serve index.html transformed by Vite
+    app.get("/", async (req, res, next) => {
+      try {
+        const fs = await import('fs');
+        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+        template = await vite.transformIndexHtml(req.originalUrl, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
+
     app.use(vite.middlewares);
   } else {
+    console.log('Serving static files from dist (Production mode)');
     app.use(express.static(path.join(__dirname, "dist")));
     app.get("*", (req, res) => {
       res.sendFile(path.join(__dirname, "dist", "index.html"));
