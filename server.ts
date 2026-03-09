@@ -30,9 +30,21 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Request logging middleware
+  app.use((req, res, next) => {
+    if (req.url.startsWith('/api')) {
+      console.log(`[API Request] ${req.method} ${req.url}`);
+    }
+    next();
+  });
+
   // API Route to fetch history
   app.get("/api/history", async (req, res) => {
-    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    console.log("Handling GET /api/history");
+    if (!supabase) {
+      console.error("History fetch failed: Supabase not configured");
+      return res.status(503).json({ error: "Supabase not configured" });
+    }
     
     const { data, error } = await supabase
       .from("tweets_history")
