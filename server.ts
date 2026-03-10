@@ -22,54 +22,57 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // API Routes
-  const apiRouter = express.Router();
+  // --- API Routes (MUST be before Vite/Static middleware) ---
+  console.log("[Server] Registering API routes...");
 
-  apiRouter.get("/ping", (req, res) => {
-    console.log("[API] Ping requested");
-    res.json({ status: "ok", supabase: !!supabase, env: process.env.NODE_ENV });
+  app.get("/api/ping", (req, res) => {
+    console.log("[API] GET /api/ping - Requested");
+    res.json({ 
+      status: "ok", 
+      supabase: !!supabase, 
+      env: process.env.NODE_ENV,
+      time: new Date().toISOString()
+    });
   });
 
-  apiRouter.get("/history", async (req, res) => {
-    console.log("[API] Fetching history...");
+  app.get("/api/history", async (req, res) => {
+    console.log("[API] GET /api/history - Requested");
     if (!supabase) {
-      console.error("[API] Supabase not configured for history fetch");
+      console.error("[API] Supabase not configured");
       return res.status(503).json({ error: "Supabase not configured" });
     }
     try {
-      const { data, error } = await supabase.from("tweets_history").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("tweets_history")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
       if (error) {
         console.error("[API] Supabase fetch error:", error);
-        throw error;
+        return res.status(500).json({ error: error.message });
       }
-      console.log(`[API] Found ${data?.length || 0} history items`);
+      console.log(`[API] Found ${data?.length || 0} items`);
       res.json(data || []);
     } catch (err: any) {
+      console.error("[API] History exception:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  apiRouter.post("/save-history", async (req, res) => {
-    console.log("[API] Saving history:", req.body.date_range);
-    if (!supabase) {
-      console.error("[API] Supabase not configured for history save");
-      return res.status(503).json({ error: "Supabase not configured" });
-    }
+  app.post("/api/save-history", async (req, res) => {
+    console.log("[API] POST /api/save-history - Requested");
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     try {
       const { data, error } = await supabase.from("tweets_history").insert([req.body]).select();
-      if (error) {
-        console.error("[API] Supabase insert error:", error);
-        throw error;
-      }
-      console.log("[API] History saved successfully:", data?.[0]?.id);
+      if (error) throw error;
       res.json({ success: true, id: data?.[0]?.id });
     } catch (err: any) {
-      console.error("[API] Save history exception:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  apiRouter.post("/update-tweet-status", async (req, res) => {
+  app.post("/api/update-tweet-status", async (req, res) => {
+    console.log("[API] POST /api/update-tweet-status - Requested");
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     try {
       const { historyId, groupIndex, tweetIndex, status } = req.body;
@@ -89,7 +92,7 @@ async function startServer() {
     }
   });
 
-  app.use("/api", apiRouter);
+  // --- End of API Routes ---
 
   if (process.env.NODE_ENV !== "production") {
     console.log("[Server] Setting up Vite middleware for development...");
