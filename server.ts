@@ -29,18 +29,19 @@ async function startServer() {
   });
 
   // 1. API Routes
-  app.get("/api/ping", (req, res) => {
+  const apiRouter = express.Router();
+
+  apiRouter.get("/ping", (req, res) => {
     console.log("[API] Ping hit");
-    res.json({ status: "ok", supabase: !!supabase });
+    res.json({ 
+      status: "ok", 
+      supabase: !!supabase,
+      timestamp: new Date().toISOString()
+    });
   });
 
-  app.get("/test", (req, res) => {
-    console.log("[Server] Test route hit");
-    res.send("Express is working!");
-  });
-
-  app.get("/api/history", async (req, res) => {
-    console.log("[API] GET /api/history");
+  apiRouter.get("/history", async (req, res) => {
+    console.log("[API] GET /history");
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     try {
       const { data, error } = await supabase.from("tweets_history").select("*").order("created_at", { ascending: false });
@@ -51,8 +52,8 @@ async function startServer() {
     }
   });
 
-  app.post("/api/save-history", async (req, res) => {
-    console.log("[API] POST /api/save-history");
+  apiRouter.post("/save-history", async (req, res) => {
+    console.log("[API] POST /save-history");
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     try {
       const { data, error } = await supabase.from("tweets_history").insert([req.body]).select();
@@ -63,8 +64,8 @@ async function startServer() {
     }
   });
 
-  app.post("/api/update-tweet-status", async (req, res) => {
-    console.log("[API] POST /api/update-tweet-status");
+  apiRouter.post("/update-tweet-status", async (req, res) => {
+    console.log("[API] POST /update-tweet-status");
     const { historyId, groupIndex, tweetIndex, status } = req.body;
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     try {
@@ -80,6 +81,12 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  app.use("/api", apiRouter);
+
+  app.get("/test-server", (req, res) => {
+    res.send("Express Server is ALIVE");
   });
 
   // Vite middleware for development
