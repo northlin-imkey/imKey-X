@@ -136,17 +136,33 @@ ALTER TABLE tweets_history DISABLE ROW LEVEL SECURITY;`}
     return (
       <div className="text-center py-20 bg-gray-800/50 rounded-2xl border border-gray-700 flex flex-col items-center">
         <p className="text-gray-400 mb-4">尚無歷史紀錄</p>
-        <div className="flex gap-4">
-          <button 
-            onClick={() => fetchHistory()}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
-          >
-            重新整理
-          </button>
+        <div className="flex flex-col gap-4 items-center">
+          <div className="flex gap-4">
+            <button 
+              onClick={() => fetchHistory()}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+            >
+              重新整理
+            </button>
+            <button 
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/ping');
+                  const data = await res.json();
+                  alert(`伺服器連線：${data.status}\n資料庫設定：${data.supabase ? '已完成' : '未完成'}\n環境：${data.env}`);
+                } catch (err) {
+                  alert('無法連線到伺服器');
+                }
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-colors"
+            >
+              測試連線狀態
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2 max-w-xs">
+            提示：產生推文後會自動儲存到這裡。如果已經產生過但仍沒看到，請點擊「測試連線狀態」檢查設定。
+          </p>
         </div>
-        <p className="text-xs text-gray-500 mt-6 max-w-xs">
-          提示：產生推文後會自動儲存到這裡。如果已經產生過但仍沒看到，請確認 Supabase 設定是否正確。
-        </p>
       </div>
     );
   }

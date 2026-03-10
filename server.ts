@@ -26,14 +26,23 @@ async function startServer() {
   const apiRouter = express.Router();
 
   apiRouter.get("/ping", (req, res) => {
-    res.json({ status: "ok", supabase: !!supabase });
+    console.log("[API] Ping requested");
+    res.json({ status: "ok", supabase: !!supabase, env: process.env.NODE_ENV });
   });
 
   apiRouter.get("/history", async (req, res) => {
-    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    console.log("[API] Fetching history...");
+    if (!supabase) {
+      console.error("[API] Supabase not configured for history fetch");
+      return res.status(503).json({ error: "Supabase not configured" });
+    }
     try {
       const { data, error } = await supabase.from("tweets_history").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error("[API] Supabase fetch error:", error);
+        throw error;
+      }
+      console.log(`[API] Found ${data?.length || 0} history items`);
       res.json(data || []);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -41,12 +50,21 @@ async function startServer() {
   });
 
   apiRouter.post("/save-history", async (req, res) => {
-    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    console.log("[API] Saving history:", req.body.date_range);
+    if (!supabase) {
+      console.error("[API] Supabase not configured for history save");
+      return res.status(503).json({ error: "Supabase not configured" });
+    }
     try {
-      const { error } = await supabase.from("tweets_history").insert([req.body]);
-      if (error) throw error;
-      res.json({ success: true });
+      const { data, error } = await supabase.from("tweets_history").insert([req.body]).select();
+      if (error) {
+        console.error("[API] Supabase insert error:", error);
+        throw error;
+      }
+      console.log("[API] History saved successfully:", data?.[0]?.id);
+      res.json({ success: true, id: data?.[0]?.id });
     } catch (err: any) {
+      console.error("[API] Save history exception:", err.message);
       res.status(500).json({ error: err.message });
     }
   });

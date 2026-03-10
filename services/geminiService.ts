@@ -70,16 +70,24 @@ const getSystemInstruction = (lang: Language, t: Tone) => {
 
 const saveToHistory = async (language: Language, tone: Tone, content: DailyTweetGroup[], dateRange?: string) => {
   try {
-    console.log('Saving to history:', { language, tone, dateRange });
+    console.log('[GeminiService] Attempting to save to history:', { language, tone, dateRange });
     const response = await fetch('/api/save-history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ language, tone, content, date_range: dateRange }),
     });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Server responded with ${response.status}`);
+    }
+    
     const result = await response.json();
-    console.log('Save result:', result);
-  } catch (err) {
-    console.error('Failed to save history:', err);
+    console.log('[GeminiService] Save result:', result);
+    return result;
+  } catch (err: any) {
+    console.error('[GeminiService] Failed to save history:', err.message);
+    throw err;
   }
 };
 
@@ -138,8 +146,12 @@ export const generateTweets = async (imageFile: File, language: Language, tone: 
     dateRange = `${dates[0]} - ${dates[dates.length - 1]}`;
   }
   
-  // Save to history asynchronously
-  saveToHistory(language, tone, generatedContent, dateRange);
+  // Save to history
+  try {
+    await saveToHistory(language, tone, generatedContent, dateRange);
+  } catch (err) {
+    console.warn('[GeminiService] History save failed but continuing:', err);
+  }
 
   return generatedContent;
 };
@@ -185,8 +197,12 @@ export const generateCelebrationTweets = async (asset: string, price: string, la
     tweets: generatedContent
   }];
 
-  // Save to history asynchronously
-  saveToHistory(language, tone, formattedResponse, `Breakthrough: ${asset}`);
+  // Save to history
+  try {
+    await saveToHistory(language, tone, formattedResponse, `Breakthrough: ${asset}`);
+  } catch (err) {
+    console.warn('[GeminiService] History save failed but continuing:', err);
+  }
 
   return formattedResponse;
 };
