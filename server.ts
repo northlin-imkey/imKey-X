@@ -19,13 +19,25 @@ async function startServer() {
 
   console.log(`[Server] Starting...`);
 
-  // 1. API Routes FIRST
+  app.use(cors());
+  app.use(express.json());
+
+  // Request logger
+  app.use((req, res, next) => {
+    console.log(`[Server] ${req.method} ${req.url}`);
+    next();
+  });
+
+  // 1. API Routes
   app.get("/api/ping", (req, res) => {
+    console.log("[API] Ping hit");
     res.json({ status: "ok", supabase: !!supabase });
   });
 
-  app.use(cors());
-  app.use(express.json());
+  app.get("/test", (req, res) => {
+    console.log("[Server] Test route hit");
+    res.send("Express is working!");
+  });
 
   app.get("/api/history", async (req, res) => {
     console.log("[API] GET /api/history");
