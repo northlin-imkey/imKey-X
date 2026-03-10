@@ -17,7 +17,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  console.log(`[Server] Starting in ${process.env.NODE_ENV || 'development'} mode`);
+  console.log(`[Server] Starting in ${process.env.NODE_ENV || 'development'} mode - Build Time: ${new Date().toISOString()}`);
 
   app.use(cors());
   app.use(express.json());
@@ -92,12 +92,13 @@ async function startServer() {
   app.use("/api", apiRouter);
 
   if (process.env.NODE_ENV !== "production") {
-    console.log("[Server] Setting up Vite middleware...");
+    console.log("[Server] Setting up Vite middleware for development...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
+    console.log("[Server] Vite middleware attached.");
     
     // Explicit root handler
     app.get("/", async (req, res, next) => {

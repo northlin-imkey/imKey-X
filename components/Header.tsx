@@ -14,7 +14,7 @@ const Header: React.FC = () => {
             </div>
             <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">
               imKey <span className="text-gray-400">推文產生器</span>
-              <span className="ml-2 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] rounded border border-emerald-500/30 font-black uppercase">v2.0</span>
+              <span className="ml-2 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] rounded border border-emerald-500/30 font-black uppercase">v2.1</span>
             </h1>
           </div>
           <div className="hidden lg:block border-l border-gray-700 h-8"></div>
