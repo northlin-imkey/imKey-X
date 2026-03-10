@@ -17,6 +17,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  console.log(`[Server] Starting in ${process.env.NODE_ENV || 'development'} mode`);
+
   app.use(cors());
   app.use(express.json());
 
@@ -72,22 +74,33 @@ async function startServer() {
   app.use("/api", apiRouter);
 
   if (process.env.NODE_ENV !== "production") {
+    console.log("[Server] Setting up Vite middleware...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
     
-    // SPA Fallback
-    app.use('*', async (req, res, next) => {
+    // Explicit root handler
+    app.get("/", async (req, res, next) => {
+      try {
+        const indexPath = path.join(__dirname, "index.html");
+        console.log(`[Server] Serving index.html from ${indexPath}`);
+        let template = fs.readFileSync(indexPath, "utf-8");
+        template = await vite.transformIndexHtml("/", template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(template);
+      } catch (e: any) {
+        console.error(`[Server] Error serving root: ${e.message}`);
+        next(e);
+      }
+    });
+
+    app.get("*", async (req, res, next) => {
       const url = req.originalUrl;
       if (url.startsWith('/api')) return next();
       
       try {
         const indexPath = path.join(__dirname, "index.html");
-        if (!fs.existsSync(indexPath)) {
-          return res.status(500).send("index.html not found");
-        }
         let template = fs.readFileSync(indexPath, "utf-8");
         template = await vite.transformIndexHtml(url, template);
         res.status(200).set({ "Content-Type": "text/html" }).end(template);
@@ -97,6 +110,7 @@ async function startServer() {
       }
     });
   } else {
+    console.log("[Server] Serving static files from dist...");
     const distPath = path.join(__dirname, "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
@@ -105,8 +119,10 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`[Server] Running on http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((err) => {
+  console.error("[Server] Critical startup error:", err);
+});

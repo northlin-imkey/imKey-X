@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { type DailyTweetGroup, type Language, type Tone } from './types';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
 import ResultsSection from './components/ResultsSection';
 import HistorySection from './components/HistorySection';
 import CelebrationTool from './components/CelebrationTool';
+import { DailyTweetGroup, Language, Tone } from './types';
 import { generateTweets, generateCelebrationTweets } from './services/geminiService';
 
 const App: React.FC = () => {
