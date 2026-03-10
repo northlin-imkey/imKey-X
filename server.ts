@@ -17,97 +17,58 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  console.log(`[Server] Starting in ${process.env.NODE_ENV || 'development'} mode - Build Time: ${new Date().toISOString()}`);
+  console.log(`[Server] Starting...`);
+
+  // 1. API Routes FIRST
+  app.get("/api/ping", (req, res) => {
+    res.json({ status: "ok", supabase: !!supabase });
+  });
 
   app.use(cors());
   app.use(express.json());
 
-  // --- API Routes (MUST be before Vite/Static middleware) ---
-  const apiRouter = express.Router();
-
-  apiRouter.get("/ping", (req, res) => {
-    console.log("[API] GET /api/ping - Requested");
-    res.json({ 
-      status: "ok", 
-      supabase: !!supabase, 
-      env: process.env.NODE_ENV,
-      time: new Date().toISOString()
-    });
-  });
-
-  apiRouter.get("/history", async (req, res) => {
-    console.log("[API] GET /api/history - Requested");
-    if (!supabase) {
-      return res.status(503).json({ error: "Supabase not configured" });
-    }
+  app.get("/api/history", async (req, res) => {
+    console.log("[API] GET /api/history");
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     try {
-      const { data, error } = await supabase
-        .from("tweets_history")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
+      const { data, error } = await supabase.from("tweets_history").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       res.json(data || []);
     } catch (err: any) {
-      console.error("[API] History error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  apiRouter.post("/save-history", async (req, res) => {
-    console.log("[API] POST /api/save-history - Data received:", JSON.stringify(req.body).substring(0, 100) + "...");
+  app.post("/api/save-history", async (req, res) => {
+    console.log("[API] POST /api/save-history");
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     try {
       const { data, error } = await supabase.from("tweets_history").insert([req.body]).select();
-      if (error) {
-        console.error("[Supabase Save Error]:", error);
-        throw error;
-      }
-      console.log("[API] Save success, ID:", data?.[0]?.id);
+      if (error) throw error;
       res.json({ success: true, id: data?.[0]?.id });
     } catch (err: any) {
-      console.error("[API] Save history error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  apiRouter.post("/update-tweet-status", async (req, res) => {
+  app.post("/api/update-tweet-status", async (req, res) => {
+    console.log("[API] POST /api/update-tweet-status");
     const { historyId, groupIndex, tweetIndex, status } = req.body;
-    console.log("[API] POST /api/update-tweet-status:", { historyId, groupIndex, tweetIndex, status });
-    
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
-    
     try {
-      // First get the current content
-      const { data: record, error: fetchError } = await supabase
-        .from("tweets_history")
-        .select("content")
-        .eq("id", historyId)
-        .single();
-      
+      const { data: record, error: fetchError } = await supabase.from("tweets_history").select("content").eq("id", historyId).single();
       if (fetchError) throw fetchError;
-      
       const content = record.content;
       if (content[groupIndex] && content[groupIndex].tweets[tweetIndex]) {
         content[groupIndex].tweets[tweetIndex].status = status;
       }
-      
-      const { error: updateError } = await supabase
-        .from("tweets_history")
-        .update({ content })
-        .eq("id", historyId);
-      
+      const { error: updateError } = await supabase.from("tweets_history").update({ content }).eq("id", historyId);
       if (updateError) throw updateError;
-      
       res.json({ success: true });
     } catch (err: any) {
-      console.error("[API] Update status error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
-
-  app.use("/api", apiRouter);
-  console.log("[Server] API routes registered under /api");
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

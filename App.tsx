@@ -13,18 +13,30 @@ const App: React.FC = () => {
   const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'error'>('checking');
   const [supabaseStatus, setSupabaseStatus] = useState<boolean>(false);
 
+  const [serverError, setServerError] = useState<string | null>(null);
+
   React.useEffect(() => {
     fetch('/api/ping')
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP ${res.status}: ${text.substring(0, 50)}`);
+        }
+        return res.json();
+      })
       .then(data => {
         if (data.status === 'ok') {
           setServerStatus('ok');
           setSupabaseStatus(data.supabase);
         } else {
           setServerStatus('error');
+          setServerError('Invalid response format');
         }
       })
-      .catch(() => setServerStatus('error'));
+      .catch((err) => {
+        setServerStatus('error');
+        setServerError(err.message);
+      });
   }, []);
 
   const [pannewsImage, setPannewsImage] = useState<File | null>(null);
@@ -120,7 +132,7 @@ const App: React.FC = () => {
                 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' 
                 : 'bg-red-500/10 border-red-500/30 text-red-400'
             }`}>
-              伺服器連線狀態: {serverStatus === 'checking' ? '檢查中...' : '連線失敗 (404)'}
+              伺服器狀態: {serverStatus === 'checking' ? '檢查中...' : `連線失敗 (${serverError})`}
             </div>
           </div>
         ) : !supabaseStatus && (
