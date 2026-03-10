@@ -15,8 +15,14 @@ const HistorySection: React.FC = () => {
       console.log('Fetching history...');
       const response = await fetch('/api/history');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server responded with ${response.status}`);
+        let errorMsg = `Server error: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.error || errorMsg;
+        } catch (e) {
+          // Fallback if not JSON
+        }
+        throw new Error(errorMsg);
       }
       const data = await response.json();
       console.log('History data received:', data);
