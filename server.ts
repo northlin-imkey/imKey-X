@@ -1,27 +1,17 @@
 import express from "express";
-import multer from "multer";
 import cors from "cors";
-import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
+import * as fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const upload = multer({ storage: multer.memoryStorage() });
-
-// Initialize Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const supabase = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null;
-
-if (!supabase) {
-  console.warn("Supabase is NOT configured. History features will be disabled.");
-} else {
-  console.log("Supabase initialized successfully.");
-}
 
 async function startServer() {
   const app = express();
@@ -30,118 +20,93 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // Request logging middleware
-  app.use((req, res, next) => {
-    if (req.url.startsWith('/api')) {
-      console.log(`[API Request] ${req.method} ${req.url}`);
-    }
-    next();
+  // API Routes
+  const apiRouter = express.Router();
+
+  apiRouter.get("/ping", (req, res) => {
+    res.json({ status: "ok", supabase: !!supabase });
   });
 
-  // API Route to fetch history
-  app.get("/api/history", async (req, res) => {
-    console.log("Handling GET /api/history");
-    if (!supabase) {
-      console.error("History fetch failed: Supabase not configured");
-      return res.status(503).json({ error: "Supabase not configured" });
-    }
-    
-    const { data, error } = await supabase
-      .from("tweets_history")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Supabase fetch error:", error);
-      return res.status(500).json({ error: error.message });
-    }
-    res.json(data);
-  });
-
-  // API Route to save history
-  app.post("/api/save-history", async (req, res) => {
+  apiRouter.get("/history", async (req, res) => {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
-    
-    const { language, tone, content, date_range } = req.body;
-    
-    const { error } = await supabase
-      .from("tweets_history")
-      .insert({
-        language,
-        tone,
-        content,
-        date_range
-      });
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true });
-  });
-
-  // API Route to update tweet status
-  app.post("/api/update-tweet-status", async (req, res) => {
-    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
-    
-    const { historyId, groupIndex, tweetIndex, status } = req.body;
-    
-    // Fetch the current record
-    const { data: item, error: fetchError } = await supabase
-      .from("tweets_history")
-      .select("content")
-      .eq("id", historyId)
-      .single();
-
-    if (fetchError || !item) return res.status(500).json({ error: fetchError?.message || "Item not found" });
-
-    const content = item.content as any[];
-    if (content[groupIndex] && content[groupIndex].tweets[tweetIndex]) {
-      content[groupIndex].tweets[tweetIndex].status = status;
+    try {
+      const { data, error } = await supabase.from("tweets_history").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      res.json(data || []);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
-
-    // Update the record
-    const { error: updateError } = await supabase
-      .from("tweets_history")
-      .update({ content })
-      .eq("id", historyId);
-
-    if (updateError) return res.status(500).json({ error: updateError.message });
-    res.json({ success: true });
   });
 
-  // Vite middleware for development
+  apiRouter.post("/save-history", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    try {
+      const { error } = await supabase.from("tweets_history").insert([req.body]);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  apiRouter.post("/update-tweet-status", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    try {
+      const { historyId, groupIndex, tweetIndex, status } = req.body;
+      const { data: item, error: fetchError } = await supabase.from("tweets_history").select("content").eq("id", historyId).single();
+      if (fetchError || !item) throw new Error("Item not found");
+      
+      const content = item.content as any[];
+      if (content[groupIndex]?.tweets[tweetIndex]) {
+        content[groupIndex].tweets[tweetIndex].status = status;
+      }
+      
+      const { error: updateError } = await supabase.from("tweets_history").update({ content }).eq("id", historyId);
+      if (updateError) throw updateError;
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.use("/api", apiRouter);
+
   if (process.env.NODE_ENV !== "production") {
-    console.log('Using Vite middleware (Development mode)');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
+    app.use(vite.middlewares);
     
-    // Serve index.html transformed by Vite
-    app.get("/", async (req, res, next) => {
+    // SPA Fallback
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      if (url.startsWith('/api')) return next();
+      
       try {
-        const fs = await import('fs');
-        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
-        template = await vite.transformIndexHtml(req.originalUrl, template);
-        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        const indexPath = path.join(__dirname, "index.html");
+        if (!fs.existsSync(indexPath)) {
+          return res.status(500).send("index.html not found");
+        }
+        let template = fs.readFileSync(indexPath, "utf-8");
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(template);
       } catch (e: any) {
         vite.ssrFixStacktrace(e);
         next(e);
       }
     });
-
-    app.use(vite.middlewares);
   } else {
-    console.log('Serving static files from dist (Production mode)');
-    app.use(express.static(path.join(__dirname, "dist")));
+    const distPath = path.join(__dirname, "dist");
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`__dirname: ${__dirname}`);
   });
 }
 
-startServer();
+startServer().catch(console.error);

@@ -8,6 +8,7 @@ import CelebrationTool from './components/CelebrationTool';
 import { generateTweets, generateCelebrationTweets } from './services/geminiService';
 
 const App: React.FC = () => {
+  console.log('App component is rendering');
   const [view, setView] = useState<'generator' | 'history'>('generator');
   const [pannewsImage, setPannewsImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
