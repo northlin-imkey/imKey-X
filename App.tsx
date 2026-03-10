@@ -10,6 +10,23 @@ import { generateTweets, generateCelebrationTweets } from './services/geminiServ
 const App: React.FC = () => {
   console.log('App component is rendering');
   const [view, setView] = useState<'generator' | 'history'>('generator');
+  const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'error'>('checking');
+  const [supabaseStatus, setSupabaseStatus] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    fetch('/api/ping')
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'ok') {
+          setServerStatus('ok');
+          setSupabaseStatus(data.supabase);
+        } else {
+          setServerStatus('error');
+        }
+      })
+      .catch(() => setServerStatus('error'));
+  }, []);
+
   const [pannewsImage, setPannewsImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [generatedTweets, setGeneratedTweets] = useState<DailyTweetGroup[]>([]);
@@ -95,6 +112,24 @@ const App: React.FC = () => {
             歷史紀錄
           </button>
         </div>
+        
+        {serverStatus !== 'ok' ? (
+          <div className="mt-4 flex justify-center">
+            <div className={`text-xs px-3 py-1 rounded-full border ${
+              serverStatus === 'checking' 
+                ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' 
+                : 'bg-red-500/10 border-red-500/30 text-red-400'
+            }`}>
+              伺服器連線狀態: {serverStatus === 'checking' ? '檢查中...' : '連線失敗 (404)'}
+            </div>
+          </div>
+        ) : !supabaseStatus && (
+          <div className="mt-4 flex justify-center">
+            <div className="text-xs px-3 py-1 rounded-full border bg-red-500/10 border-red-500/30 text-red-400">
+              Supabase 未設定，歷史紀錄功能將無法使用
+            </div>
+          </div>
+        )}
       </div>
 
       <main className="flex-grow container mx-auto p-4 md:p-8">
