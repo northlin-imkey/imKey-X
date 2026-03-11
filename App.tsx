@@ -16,28 +16,35 @@ const App: React.FC = () => {
   const [serverError, setServerError] = useState<string | null>(null);
 
   React.useEffect(() => {
-    fetch('/api/ping')
-      .then(async res => {
+    const checkServer = async () => {
+      try {
+        console.log(`Checking server at: ${window.location.origin}/api/ping`);
+        const res = await fetch('/api/ping', { cache: 'no-cache' });
+        
         if (!res.ok) {
           const text = await res.text();
-          throw new Error(`HTTP ${res.status}: ${text.substring(0, 50)}`);
+          console.error(`Server check failed: ${res.status}`, text);
+          throw new Error(`HTTP ${res.status}: ${text.substring(0, 100)}`);
         }
-        return res.json();
-      })
-      .then(data => {
+        
+        const data = await res.json();
+        console.log('Server check success:', data);
+        
         if (data.status === 'ok') {
           setServerStatus('ok');
           setSupabaseStatus(data.supabase);
-          console.log(`Server environment: ${data.env}`);
         } else {
           setServerStatus('error');
           setServerError('Invalid response format');
         }
-      })
-      .catch((err) => {
+      } catch (err: any) {
+        console.error('Fetch error:', err);
         setServerStatus('error');
-        setServerError(err.message);
-      });
+        setServerError(err.message || 'Unknown connection error');
+      }
+    };
+
+    checkServer();
   }, []);
 
   const [pannewsImage, setPannewsImage] = useState<File | null>(null);

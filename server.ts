@@ -45,22 +45,18 @@ async function startServer() {
     next();
   });
 
-  // 1. API Routes
-  const apiRouter = express.Router();
-
-  apiRouter.get("/ping", (req, res) => {
-    console.log("[API] Ping hit - Sending response");
-    const supabaseClient = getSupabase();
+  // 1. API Routes - Mount directly on app for maximum reliability
+  app.get("/api/ping", (req, res) => {
+    console.log(`[Server] Ping hit from ${req.ip}`);
     res.json({ 
       status: "ok", 
-      supabase: !!supabaseClient,
-      env: process.env.NODE_ENV || 'undefined',
-      timestamp: new Date().toISOString()
+      supabase: !!getSupabase(),
+      env: process.env.NODE_ENV || 'development',
+      time: new Date().toISOString()
     });
   });
 
-  apiRouter.get("/history", async (req, res) => {
-    console.log("[API] GET /history");
+  app.get("/api/history", async (req, res) => {
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
     try {
@@ -68,13 +64,11 @@ async function startServer() {
       if (error) throw error;
       res.json(data || []);
     } catch (err: any) {
-      console.error("[API] History error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  apiRouter.post("/save-history", async (req, res) => {
-    console.log("[API] POST /save-history");
+  app.post("/api/save-history", async (req, res) => {
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
     try {
@@ -82,13 +76,11 @@ async function startServer() {
       if (error) throw error;
       res.json({ success: true, id: data?.[0]?.id });
     } catch (err: any) {
-      console.error("[API] Save history error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  apiRouter.post("/update-tweet-status", async (req, res) => {
-    console.log("[API] POST /update-tweet-status");
+  app.post("/api/update-tweet-status", async (req, res) => {
     const { historyId, groupIndex, tweetIndex, status } = req.body;
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
@@ -103,18 +95,9 @@ async function startServer() {
       if (updateError) throw updateError;
       res.json({ success: true });
     } catch (err: any) {
-      console.error("[API] Update status error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
-
-  apiRouter.use((req, res) => {
-    console.warn(`[API] 404 Not Found: ${req.method} ${req.originalUrl}`);
-    res.status(404).json({ error: `API route not found: ${req.originalUrl}` });
-  });
-
-  app.use("/api", apiRouter);
-  console.log("[Server] API routes mounted at /api");
 
   app.get("/healthz", (req, res) => {
     res.send("OK");
