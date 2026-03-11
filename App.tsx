@@ -28,18 +28,19 @@ const App: React.FC = () => {
           }
         });
         
-        const contentType = res.headers.get('content-type');
-        console.log(`Response status: ${res.status}, Content-Type: ${contentType}`);
-
         if (!res.ok) {
           const text = await res.text();
           console.error(`Server check failed [${res.status}]:`, text);
-          throw new Error(`伺服器回傳錯誤 (${res.status}) - ${text.substring(0, 50)}`);
+          throw new Error(`HTTP ${res.status}: ${text.substring(0, 100)}`);
         }
         
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('Unexpected content type:', contentType);
-          throw new Error('伺服器未回傳 JSON 格式 (可能是路由衝突)');
+        const contentType = res.headers.get('content-type') || '';
+        console.log(`Response status: ${res.status}, Content-Type: ${contentType}`);
+
+        if (!contentType.includes('application/json')) {
+          const text = await res.text();
+          console.error('Unexpected content type:', contentType, 'Body:', text);
+          throw new Error(`非 JSON 回應 (${contentType}): ${text.substring(0, 50)}`);
         }
         
         const data = await res.json();

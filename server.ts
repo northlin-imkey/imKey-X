@@ -47,52 +47,42 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // ABSOLUTE FIRST MIDDLEWARE - LOG EVERYTHING
+  // 1. Global Middleware
+  app.use(cors());
+  app.use(express.json());
+  
   app.use((req, res, next) => {
-    console.log(`[Incoming Request] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+    console.log(`[Request] ${req.method} ${req.url}`);
     next();
   });
 
-  console.log(`[Server] Initializing routes...`);
+  // 2. Health Checks
+  app.get("/healthz", (req, res) => res.status(200).send("OK"));
+  app.get("/ping", (req, res) => res.status(200).json({ status: "root-ok" }));
 
-  // Health check for the platform
-  app.get("/healthz", (req, res) => res.send("OK"));
+  // 3. API Router
+  const apiRouter = express.Router();
 
-  app.get("/ping", (req, res) => res.json({ status: "root-ok" }));
-
-  // 0. Absolute First Priority API Routes
-  app.get("/backend/ping", (req, res) => {
-    console.log(`[Server] Backend Ping hit!`);
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json({ 
+  apiRouter.get("/ping", (req, res) => {
+    console.log(`[API] Ping hit`);
+    res.json({ 
       status: "ok", 
       supabase: !!getSupabase(),
-      env: process.env.NODE_ENV || 'not-set',
+      env: process.env.NODE_ENV,
       time: new Date().toISOString()
     });
   });
 
-  app.get("/backend/debug", (req, res) => {
+  apiRouter.get("/debug", (req, res) => {
     res.json({
       url: req.url,
-      method: req.method,
       headers: req.headers,
       env: process.env.NODE_ENV,
       cwd: process.cwd()
     });
   });
 
-  app.use(cors());
-  app.use(express.json());
-
-  // Request logger
-  app.use((req, res, next) => {
-    console.log(`[Server] ${req.method} ${req.url}`);
-    next();
-  });
-
-  // 1. Other API Routes
-  app.get("/backend/history", async (req, res) => {
+  apiRouter.get("/history", async (req, res) => {
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
     try {
@@ -104,7 +94,7 @@ async function startServer() {
     }
   });
 
-  app.post("/backend/save-history", async (req, res) => {
+  apiRouter.post("/save-history", async (req, res) => {
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
     try {
@@ -116,7 +106,7 @@ async function startServer() {
     }
   });
 
-  app.post("/backend/update-tweet-status", async (req, res) => {
+  apiRouter.post("/update-tweet-status", async (req, res) => {
     const { historyId, groupIndex, tweetIndex, status } = req.body;
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
@@ -135,11 +125,9 @@ async function startServer() {
     }
   });
 
-  app.get("/healthz", (req, res) => {
-    res.send("OK");
-  });
+  app.use("/backend", apiRouter);
 
-  // Vite middleware for development
+  // 4. Vite Middleware
   const isProduction = false; // FORCE DEVELOPMENT MODE FOR DEBUGGING
   console.log(`[Server] Mode: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'} (Forced)`);
   
