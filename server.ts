@@ -36,22 +36,8 @@ async function startServer() {
 
   console.log(`[Server] Starting...`);
 
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Server] Express listener active on http://0.0.0.0:${PORT}`);
-  });
-
   app.use(cors());
   app.use(express.json());
-
-  // DEBUG: Top-level route
-  app.get("/debug-ping", (req, res) => {
-    console.log("[Server] Debug ping hit!");
-    res.json({
-      message: "EXPRESS IS ALIVE AND REACHABLE",
-      env: process.env.NODE_ENV,
-      supabase: !!getSupabase()
-    });
-  });
 
   // Request logger
   app.use((req, res, next) => {
@@ -126,7 +112,9 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  if (!isProduction) {
     console.log("[Server] Setting up Vite middleware for development...");
     try {
       const vite = await createViteServer({
@@ -141,11 +129,22 @@ async function startServer() {
   } else {
     console.log("[Server] Serving static files from dist...");
     const distPath = path.join(__dirname, "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    } else {
+      console.warn("[Server] dist directory not found. Static files will not be served.");
+      app.get("*", (req, res) => {
+        res.status(404).send("Production build not found. Please run 'npm run build'.");
+      });
+    }
   }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`[Server] Express listener active on http://0.0.0.0:${PORT}`);
+  });
 }
 
 startServer().catch((err) => {
