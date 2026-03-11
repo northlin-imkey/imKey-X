@@ -34,7 +34,28 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  console.log(`[Server] Starting...`);
+  console.log(`[Server] Starting startup sequence...`);
+
+  // 0. Absolute First Priority Routes (No middleware)
+  app.get("/api/ping", (req, res) => {
+    console.log(`[Server] Ping hit! Status: OK`);
+    res.json({ 
+      status: "ok", 
+      supabase: !!getSupabase(),
+      env: process.env.NODE_ENV || 'development',
+      time: new Date().toISOString()
+    });
+  });
+
+  app.get("/api/debug", (req, res) => {
+    res.json({
+      url: req.url,
+      method: req.method,
+      headers: req.headers,
+      env: process.env.NODE_ENV,
+      cwd: process.cwd()
+    });
+  });
 
   app.use(cors());
   app.use(express.json());
@@ -45,17 +66,7 @@ async function startServer() {
     next();
   });
 
-  // 1. API Routes - Mount directly on app for maximum reliability
-  app.get("/api/ping", (req, res) => {
-    console.log(`[Server] Ping hit from ${req.ip}`);
-    res.json({ 
-      status: "ok", 
-      supabase: !!getSupabase(),
-      env: process.env.NODE_ENV || 'development',
-      time: new Date().toISOString()
-    });
-  });
-
+  // 1. Other API Routes
   app.get("/api/history", async (req, res) => {
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });

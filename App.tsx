@@ -18,13 +18,23 @@ const App: React.FC = () => {
   React.useEffect(() => {
     const checkServer = async () => {
       try {
-        console.log(`Checking server at: ${window.location.origin}/api/ping`);
-        const res = await fetch('/api/ping', { cache: 'no-cache' });
+        const pingUrl = `/api/ping?t=${Date.now()}`;
+        console.log(`Checking server at: ${pingUrl}`);
+        const res = await fetch(pingUrl, { 
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
         
+        const contentType = res.headers.get('content-type');
         if (!res.ok) {
           const text = await res.text();
-          console.error(`Server check failed: ${res.status}`, text);
-          throw new Error(`HTTP ${res.status}: ${text.substring(0, 100)}`);
+          console.error(`Server check failed [${res.status}]:`, text);
+          throw new Error(`伺服器回傳錯誤 (${res.status})`);
+        }
+        
+        if (!contentType || !contentType.includes('application/json')) {
+          console.error('Unexpected content type:', contentType);
+          throw new Error('伺服器未回傳 JSON 格式 (可能是路由衝突)');
         }
         
         const data = await res.json();
@@ -35,12 +45,12 @@ const App: React.FC = () => {
           setSupabaseStatus(data.supabase);
         } else {
           setServerStatus('error');
-          setServerError('Invalid response format');
+          setServerError('伺服器回應格式錯誤');
         }
       } catch (err: any) {
         console.error('Fetch error:', err);
         setServerStatus('error');
-        setServerError(err.message || 'Unknown connection error');
+        setServerError(err.message || '無法連線至後端伺服器');
       }
     };
 
