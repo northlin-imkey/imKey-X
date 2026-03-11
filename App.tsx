@@ -134,6 +134,18 @@ const App: React.FC = () => {
                 : 'bg-red-500/10 border-red-500/30 text-red-400'
             }`}>
               伺服器狀態: {serverStatus === 'checking' ? '檢查中...' : `連線失敗 (${serverError})`}
+              {serverStatus === 'error' && (
+                <button 
+                  onClick={() => {
+                    setServerStatus('checking');
+                    setServerError(null);
+                    window.location.reload();
+                  }}
+                  className="ml-2 underline hover:text-white"
+                >
+                  重試
+                </button>
+              )}
             </div>
           </div>
         ) : !supabaseStatus && (

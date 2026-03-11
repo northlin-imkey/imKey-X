@@ -49,12 +49,12 @@ async function startServer() {
   const apiRouter = express.Router();
 
   apiRouter.get("/ping", (req, res) => {
-    console.log("[API] Ping hit");
+    console.log("[API] Ping hit - Sending response");
     const supabaseClient = getSupabase();
     res.json({ 
       status: "ok", 
       supabase: !!supabaseClient,
-      env: process.env.NODE_ENV,
+      env: process.env.NODE_ENV || 'undefined',
       timestamp: new Date().toISOString()
     });
   });
@@ -68,6 +68,7 @@ async function startServer() {
       if (error) throw error;
       res.json(data || []);
     } catch (err: any) {
+      console.error("[API] History error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
@@ -81,6 +82,7 @@ async function startServer() {
       if (error) throw error;
       res.json({ success: true, id: data?.[0]?.id });
     } catch (err: any) {
+      console.error("[API] Save history error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
@@ -101,14 +103,21 @@ async function startServer() {
       if (updateError) throw updateError;
       res.json({ success: true });
     } catch (err: any) {
+      console.error("[API] Update status error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.use("/api", apiRouter);
+  apiRouter.use((req, res) => {
+    console.warn(`[API] 404 Not Found: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: `API route not found: ${req.originalUrl}` });
+  });
 
-  app.get("/test-server", (req, res) => {
-    res.send("Express Server is ALIVE");
+  app.use("/api", apiRouter);
+  console.log("[Server] API routes mounted at /api");
+
+  app.get("/healthz", (req, res) => {
+    res.send("OK");
   });
 
   // Vite middleware for development
