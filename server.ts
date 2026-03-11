@@ -1,3 +1,8 @@
+console.log("========================================");
+console.log("SERVER.TS IS LOADING...");
+console.log("TIME:", new Date().toISOString());
+console.log("========================================");
+
 import express from "express";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
@@ -46,8 +51,8 @@ async function startServer() {
   app.get("/healthz", (req, res) => res.send("OK"));
 
   // 0. Absolute First Priority API Routes
-  app.get("/api/ping", (req, res) => {
-    console.log(`[Server] API Ping hit!`);
+  app.get("/backend/ping", (req, res) => {
+    console.log(`[Server] Backend Ping hit!`);
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ 
       status: "ok", 
@@ -57,7 +62,7 @@ async function startServer() {
     });
   });
 
-  app.get("/api/debug", (req, res) => {
+  app.get("/backend/debug", (req, res) => {
     res.json({
       url: req.url,
       method: req.method,
@@ -77,7 +82,7 @@ async function startServer() {
   });
 
   // 1. Other API Routes
-  app.get("/api/history", async (req, res) => {
+  app.get("/backend/history", async (req, res) => {
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
     try {
@@ -89,7 +94,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/save-history", async (req, res) => {
+  app.post("/backend/save-history", async (req, res) => {
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
     try {
@@ -101,7 +106,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/update-tweet-status", async (req, res) => {
+  app.post("/backend/update-tweet-status", async (req, res) => {
     const { historyId, groupIndex, tweetIndex, status } = req.body;
     const supabaseClient = getSupabase();
     if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
@@ -125,8 +130,8 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  const isProduction = process.env.NODE_ENV === "production";
-  console.log(`[Server] Mode: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+  const isProduction = false; // FORCE DEVELOPMENT MODE FOR DEBUGGING
+  console.log(`[Server] Mode: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'} (Forced)`);
   
   if (!isProduction) {
     console.log("[Server] Setting up Vite middleware for development...");

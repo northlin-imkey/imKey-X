@@ -18,18 +18,23 @@ const App: React.FC = () => {
   React.useEffect(() => {
     const checkServer = async () => {
       try {
-        const pingUrl = `/api/ping?t=${Date.now()}`;
+        const pingUrl = `${window.location.origin}/backend/ping?t=${Date.now()}`;
         console.log(`Checking server at: ${pingUrl}`);
         const res = await fetch(pingUrl, { 
           method: 'GET',
-          headers: { 'Accept': 'application/json' }
+          headers: { 
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
+          }
         });
         
         const contentType = res.headers.get('content-type');
+        console.log(`Response status: ${res.status}, Content-Type: ${contentType}`);
+
         if (!res.ok) {
           const text = await res.text();
           console.error(`Server check failed [${res.status}]:`, text);
-          throw new Error(`伺服器回傳錯誤 (${res.status})`);
+          throw new Error(`伺服器回傳錯誤 (${res.status}) - ${text.substring(0, 50)}`);
         }
         
         if (!contentType || !contentType.includes('application/json')) {

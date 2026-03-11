@@ -71,7 +71,7 @@ const getSystemInstruction = (lang: Language, t: Tone) => {
 const saveToHistory = async (language: Language, tone: Tone, content: DailyTweetGroup[], dateRange?: string) => {
   try {
     console.log('[GeminiService] Attempting to save to history:', { language, tone, dateRange });
-    const response = await fetch('/api/save-history', {
+    const response = await fetch('/backend/save-history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ language, tone, content, date_range: dateRange }),
@@ -94,7 +94,7 @@ const saveToHistory = async (language: Language, tone: Tone, content: DailyTweet
 export const updateTweetStatus = async (historyId: string, groupIndex: number, tweetIndex: number, status: string) => {
   try {
     console.log('Updating status:', { historyId, groupIndex, tweetIndex, status });
-    const response = await fetch('/api/update-tweet-status', {
+    const response = await fetch('/backend/update-tweet-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ historyId, groupIndex, tweetIndex, status }),

@@ -13,7 +13,7 @@ const HistorySection: React.FC = () => {
   const fetchHistory = async () => {
     try {
       console.log('Fetching history...');
-      const response = await fetch('/api/history');
+      const response = await fetch('/backend/history');
       if (!response.ok) {
         let errorMsg = `Server error: ${response.status}`;
         try {
@@ -153,7 +153,7 @@ ALTER TABLE tweets_history DISABLE ROW LEVEL SECURITY;`}
             <button 
               onClick={async () => {
                 try {
-                  const res = await fetch('/api/ping');
+                  const res = await fetch('/backend/ping');
                   const data = await res.json();
                   alert(`伺服器連線：${data.status}\n資料庫設定：${data.supabase ? '已完成' : '未完成'}\n環境：${data.env}`);
                 } catch (err) {
