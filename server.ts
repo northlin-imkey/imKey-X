@@ -35,6 +35,14 @@ console.log(`- SUPABASE_URL: ${process.env.SUPABASE_URL ? "PRESENT" : "MISSING"}
 console.log(`- SUPABASE_ANON_KEY: ${process.env.SUPABASE_ANON_KEY ? "PRESENT" : "MISSING"}`);
 console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
 
+process.on('uncaughtException', (err) => {
+  console.error('[Server] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -49,6 +57,8 @@ async function startServer() {
 
   // Health check for the platform
   app.get("/healthz", (req, res) => res.send("OK"));
+
+  app.get("/ping", (req, res) => res.json({ status: "root-ok" }));
 
   // 0. Absolute First Priority API Routes
   app.get("/backend/ping", (req, res) => {

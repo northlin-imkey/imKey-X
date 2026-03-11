@@ -18,7 +18,7 @@ const App: React.FC = () => {
   React.useEffect(() => {
     const checkServer = async () => {
       try {
-        const pingUrl = `${window.location.origin}/backend/ping?t=${Date.now()}`;
+        const pingUrl = `/backend/ping?t=${Date.now()}`;
         console.log(`Checking server at: ${pingUrl}`);
         const res = await fetch(pingUrl, { 
           method: 'GET',
@@ -156,6 +156,22 @@ const App: React.FC = () => {
                 : 'bg-red-500/10 border-red-500/30 text-red-400'
             }`}>
               伺服器狀態: {serverStatus === 'checking' ? '檢查中...' : `連線失敗 (${serverError})`}
+              <button 
+                onClick={async () => {
+                  try {
+                    const res1 = await fetch('/backend/ping');
+                    const text1 = await res1.text();
+                    const res2 = await fetch('/ping');
+                    const text2 = await res2.text();
+                    alert(`Backend: ${res1.status} - ${text1}\nRoot: ${res2.status} - ${text2}`);
+                  } catch (e: any) {
+                    alert(`Error: ${e.message}`);
+                  }
+                }}
+                className="ml-2 px-2 py-0.5 bg-white/10 rounded hover:bg-white/20"
+              >
+                手動測試
+              </button>
               {serverStatus === 'error' && (
                 <button 
                   onClick={() => {
