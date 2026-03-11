@@ -5,13 +5,30 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
 import * as fs from "fs";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-const supabase = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null;
+const getSupabase = () => {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+  
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
+
+// Initialize once at startup for logging
+const initialSupabase = getSupabase();
+console.log("[Server] Environment Check:");
+console.log(`- SUPABASE_URL: ${process.env.SUPABASE_URL ? "PRESENT" : "MISSING"}`);
+console.log(`- SUPABASE_ANON_KEY: ${process.env.SUPABASE_ANON_KEY ? "PRESENT" : "MISSING"}`);
+console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
 
 async function startServer() {
   const app = express();
@@ -29,7 +46,11 @@ async function startServer() {
   // DEBUG: Top-level route
   app.get("/debug-ping", (req, res) => {
     console.log("[Server] Debug ping hit!");
-    res.send("EXPRESS IS ALIVE AND REACHABLE");
+    res.json({
+      message: "EXPRESS IS ALIVE AND REACHABLE",
+      env: process.env.NODE_ENV,
+      supabase: !!getSupabase()
+    });
   });
 
   // Request logger
@@ -43,18 +64,21 @@ async function startServer() {
 
   apiRouter.get("/ping", (req, res) => {
     console.log("[API] Ping hit");
+    const supabaseClient = getSupabase();
     res.json({ 
       status: "ok", 
-      supabase: !!supabase,
+      supabase: !!supabaseClient,
+      env: process.env.NODE_ENV,
       timestamp: new Date().toISOString()
     });
   });
 
   apiRouter.get("/history", async (req, res) => {
     console.log("[API] GET /history");
-    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const supabaseClient = getSupabase();
+    if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
     try {
-      const { data, error } = await supabase.from("tweets_history").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabaseClient.from("tweets_history").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       res.json(data || []);
     } catch (err: any) {
@@ -64,9 +88,10 @@ async function startServer() {
 
   apiRouter.post("/save-history", async (req, res) => {
     console.log("[API] POST /save-history");
-    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const supabaseClient = getSupabase();
+    if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
     try {
-      const { data, error } = await supabase.from("tweets_history").insert([req.body]).select();
+      const { data, error } = await supabaseClient.from("tweets_history").insert([req.body]).select();
       if (error) throw error;
       res.json({ success: true, id: data?.[0]?.id });
     } catch (err: any) {
@@ -77,15 +102,16 @@ async function startServer() {
   apiRouter.post("/update-tweet-status", async (req, res) => {
     console.log("[API] POST /update-tweet-status");
     const { historyId, groupIndex, tweetIndex, status } = req.body;
-    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const supabaseClient = getSupabase();
+    if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
     try {
-      const { data: record, error: fetchError } = await supabase.from("tweets_history").select("content").eq("id", historyId).single();
+      const { data: record, error: fetchError } = await supabaseClient.from("tweets_history").select("content").eq("id", historyId).single();
       if (fetchError) throw fetchError;
       const content = record.content;
       if (content[groupIndex] && content[groupIndex].tweets[tweetIndex]) {
         content[groupIndex].tweets[tweetIndex].status = status;
       }
-      const { error: updateError } = await supabase.from("tweets_history").update({ content }).eq("id", historyId);
+      const { error: updateError } = await supabaseClient.from("tweets_history").update({ content }).eq("id", historyId);
       if (updateError) throw updateError;
       res.json({ success: true });
     } catch (err: any) {

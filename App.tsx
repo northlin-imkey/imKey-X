@@ -28,6 +28,7 @@ const App: React.FC = () => {
         if (data.status === 'ok') {
           setServerStatus('ok');
           setSupabaseStatus(data.supabase);
+          console.log(`Server environment: ${data.env}`);
         } else {
           setServerStatus('error');
           setServerError('Invalid response format');
