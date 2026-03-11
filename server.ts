@@ -34,15 +34,25 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  console.log(`[Server] Starting startup sequence...`);
+  // ABSOLUTE FIRST MIDDLEWARE - LOG EVERYTHING
+  app.use((req, res, next) => {
+    console.log(`[Incoming Request] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+    next();
+  });
 
-  // 0. Absolute First Priority Routes (No middleware)
+  console.log(`[Server] Initializing routes...`);
+
+  // Health check for the platform
+  app.get("/healthz", (req, res) => res.send("OK"));
+
+  // 0. Absolute First Priority API Routes
   app.get("/api/ping", (req, res) => {
-    console.log(`[Server] Ping hit! Status: OK`);
-    res.json({ 
+    console.log(`[Server] API Ping hit!`);
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200).json({ 
       status: "ok", 
       supabase: !!getSupabase(),
-      env: process.env.NODE_ENV || 'development',
+      env: process.env.NODE_ENV || 'not-set',
       time: new Date().toISOString()
     });
   });
@@ -116,6 +126,7 @@ async function startServer() {
 
   // Vite middleware for development
   const isProduction = process.env.NODE_ENV === "production";
+  console.log(`[Server] Mode: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
   
   if (!isProduction) {
     console.log("[Server] Setting up Vite middleware for development...");
@@ -132,15 +143,17 @@ async function startServer() {
   } else {
     console.log("[Server] Serving static files from dist...");
     const distPath = path.join(__dirname, "dist");
+    console.log(`[Server] Looking for dist at: ${distPath}`);
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
       app.get("*", (req, res) => {
+        console.log(`[Server] SPA Fallback: ${req.url}`);
         res.sendFile(path.join(distPath, "index.html"));
       });
     } else {
-      console.warn("[Server] dist directory not found. Static files will not be served.");
+      console.warn("[Server] dist directory not found!");
       app.get("*", (req, res) => {
-        res.status(404).send("Production build not found. Please run 'npm run build'.");
+        res.status(404).send(`Production build not found at ${distPath}. Please run 'npm run build'. Current ENV: ${process.env.NODE_ENV}`);
       });
     }
   }
