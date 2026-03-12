@@ -18,9 +18,10 @@ const App: React.FC = () => {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const response = await fetch('/backend/history');
+      const response = await fetch(`/backend/history?t=${Date.now()}`);
       if (response.ok) {
         const data = await response.json();
+        console.log('[App] History fetched:', data.length, 'items');
         setHistory(data);
       }
     } catch (err) {
