@@ -18,19 +18,21 @@ const Calendar: React.FC<CalendarProps> = ({ history }) => {
   const tweetDates = new Set<string>();
   history.forEach(item => {
     item.content.forEach(group => {
-      // Try to parse the date from the group.date string
-      // The format is usually "March 12" or similar from Gemini
-      // Or it might be a full date string if we saved it differently
-      // For simplicity, let's also check created_at
-      const date = new Date(item.created_at);
-      if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-        tweetDates.add(date.getDate().toString());
-      }
+      // 只有當該組日期中有推文被標記為 'published' 時，才顯示在月曆上
+      const hasPublishedTweet = group.tweets.some(t => t.status === 'published');
       
-      // Also check if group.date contains the day number
-      const match = group.date.match(/(\d+)/);
-      if (match) {
-        tweetDates.add(match[1]);
+      if (hasPublishedTweet) {
+        // 優先從 group.date 中提取日期數字 (例如 "March 12" -> "12")
+        const match = group.date.match(/(\d+)/);
+        if (match) {
+          tweetDates.add(match[1]);
+        } else {
+          // 如果 group.date 沒數字，則回退到使用該紀錄的建立日期
+          const date = new Date(item.created_at);
+          if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
+            tweetDates.add(date.getDate().toString());
+          }
+        }
       }
     });
   });
