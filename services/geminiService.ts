@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { type DailyTweetGroup, type Language, type Tone } from '../types';
+import { type DailyTweetGroup, type Language, type Tone, type TweetType } from '../types';
 
 const getApiKey = () => {
   try {
@@ -37,6 +37,11 @@ const getTweetSchema = (lang: Language) => {
                 items: { type: Type.STRING },
                 description: `3-5 relevant hashtags. In ${langDesc} or English.`,
               },
+              pollOptions: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: `Optional: 2-4 poll options if the tweet is a poll. Each option under 25 characters.`,
+              },
             },
             required: ['tweetText', 'hashtags'],
           }
@@ -47,7 +52,7 @@ const getTweetSchema = (lang: Language) => {
   };
 };
 
-const getSystemInstruction = (lang: Language, t: Tone) => {
+const getSystemInstruction = (lang: Language, t: Tone, type?: TweetType) => {
   let langInstruction = 'Simplified Chinese (简体中文)';
   if (lang === 'zh-TW') langInstruction = 'Traditional Chinese (繁體中文)';
   if (lang === 'en') langInstruction = 'English';
@@ -65,16 +70,37 @@ const getSystemInstruction = (lang: Language, t: Tone) => {
       break;
   }
 
-  return `You are an expert social media manager for imKey. ${toneInstruction} Always output in ${langInstruction}.`;
+  let typeInstruction = '';
+  if (type) {
+    switch (type) {
+      case 'educational':
+        typeInstruction = ' Focus on educating users about crypto security and imKey features.';
+        break;
+      case 'promotional':
+        typeInstruction = ' Focus on promoting imKey products and sales.';
+        break;
+      case 'interaction':
+        typeInstruction = ' Focus on engaging the community with questions or interactive content.';
+        break;
+      case 'news':
+        typeInstruction = ' Focus on reporting and commenting on the latest crypto news.';
+        break;
+      case 'poll':
+        typeInstruction = ' Create an engaging poll related to crypto security, market trends, or user preferences. Provide 2-4 clear options in the pollOptions field.';
+        break;
+    }
+  }
+
+  return `You are an expert social media manager for imKey. ${toneInstruction}${typeInstruction} Always output in ${langInstruction}.`;
 };
 
-const saveToHistory = async (language: Language, tone: Tone, content: DailyTweetGroup[], dateRange?: string) => {
+const saveToHistory = async (language: Language, tone: Tone, content: DailyTweetGroup[], dateRange?: string, tweetType?: TweetType) => {
   try {
-    console.log('[GeminiService] Attempting to save to history:', { language, tone, dateRange });
+    console.log('[GeminiService] Attempting to save to history:', { language, tone, dateRange, tweetType });
     const response = await fetch('/backend/save-history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ language, tone, content, date_range: dateRange }),
+      body: JSON.stringify({ language, tone, content, date_range: dateRange, tweet_type: tweetType }),
     });
     
     if (!response.ok) {
@@ -109,7 +135,7 @@ export const updateTweetStatus = async (historyId: string, groupIndex: number, t
   }
 };
 
-export const generateTweets = async (imageFile: File, language: Language, tone: Tone): Promise<DailyTweetGroup[]> => {
+export const generateTweets = async (imageFile: File, language: Language, tone: Tone, tweetType: TweetType): Promise<DailyTweetGroup[]> => {
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
   const base64Data = await new Promise<string>((resolve) => {
     const reader = new FileReader();
@@ -124,13 +150,13 @@ export const generateTweets = async (imageFile: File, language: Language, tone: 
     },
   };
 
-  const textPrompt = `Analyze the attached PANNEWS calendar screenshot. Identify key dates and events. Generate 1-2 distinct tweet drafts for each. Group by date. Link events to imKey security.`;
+  const textPrompt = `Analyze the attached PANNEWS calendar screenshot. Identify key dates and events. Generate 1-2 distinct tweet drafts for each. Group by date. Link events to imKey security. The tweet type should be ${tweetType}.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: { parts: [{ text: textPrompt }, imagePart] },
     config: {
-      systemInstruction: getSystemInstruction(language, tone),
+      systemInstruction: getSystemInstruction(language, tone, tweetType),
       responseMimeType: "application/json",
       responseSchema: getTweetSchema(language) as any,
       temperature: 0.7,
@@ -148,12 +174,64 @@ export const generateTweets = async (imageFile: File, language: Language, tone: 
   
   // Save to history
   try {
-    await saveToHistory(language, tone, generatedContent, dateRange);
+    await saveToHistory(language, tone, generatedContent, dateRange, tweetType);
   } catch (err) {
     console.warn('[GeminiService] History save failed but continuing:', err);
   }
 
   return generatedContent;
+};
+
+export const generateHotTopics = async (language: Language, tone: Tone): Promise<DailyTweetGroup[]> => {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  
+  const textPrompt = `
+    Find the 3 most important and trending crypto news or current events from this week.
+    For each topic, generate a tweet that:
+    1. Explains the news briefly.
+    2. Connects it to imKey Pro hardware wallet (e.g., why it makes security more important, how imKey protects against related risks).
+    3. Uses relevant emojis and hashtags.
+    4. Is under 280 characters.
+    
+    Output as a JSON array of objects with 'tweetText' and 'hashtags' (array of strings).
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: { parts: [{ text: textPrompt }] },
+    config: {
+      systemInstruction: getSystemInstruction(language, tone, 'news'),
+      tools: [{ googleSearch: {} }],
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            tweetText: { type: Type.STRING },
+            hashtags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ['tweetText', 'hashtags'],
+        }
+      } as any,
+      temperature: 0.8,
+    },
+  });
+
+  const generatedContent = JSON.parse(response.text || "[]");
+  const formattedResponse: DailyTweetGroup[] = [{
+    date: `Weekly Hot Topics (${new Date().toLocaleDateString()})`,
+    tweets: generatedContent
+  }];
+
+  // Save to history
+  try {
+    await saveToHistory(language, tone, formattedResponse, 'Weekly Hot Topics', 'news');
+  } catch (err) {
+    console.warn('[GeminiService] History save failed but continuing:', err);
+  }
+
+  return formattedResponse;
 };
 
 export const generateCelebrationTweets = async (asset: string, price: string, language: Language, tone: Tone): Promise<DailyTweetGroup[]> => {

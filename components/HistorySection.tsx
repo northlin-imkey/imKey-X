@@ -1,49 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { type HistoryItem } from '../types';
 import TweetCard from './TweetCard';
 import { updateTweetStatus } from '../services/geminiService';
 import SparklesIcon from './icons/SparklesIcon';
 
-const HistorySection: React.FC = () => {
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface HistorySectionProps {
+  history: HistoryItem[];
+  isLoading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}
+
+const HistorySection: React.FC<HistorySectionProps> = ({ history, isLoading, error, onRefresh }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  const fetchHistory = async () => {
-    try {
-      console.log('Fetching history...');
-      const response = await fetch('/backend/history');
-      if (!response.ok) {
-        let errorMsg = `Server error: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMsg = errorData.error || errorMsg;
-        } catch (e) {
-          // Fallback if not JSON
-        }
-        throw new Error(errorMsg);
-      }
-      const data = await response.json();
-      console.log('History data received:', data);
-      setHistory(data);
-    } catch (err: any) {
-      console.error('History fetch error:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHistory();
-  }, []);
 
   const handleStatusChange = async (historyId: string, groupIndex: number, tweetIndex: number, status: string) => {
     try {
       await updateTweetStatus(historyId, groupIndex, tweetIndex, status);
       // Refresh history to show updated status
-      fetchHistory();
+      onRefresh();
     } catch (err) {
       alert('更新狀態失敗');
     }
@@ -73,11 +48,7 @@ const HistorySection: React.FC = () => {
             )}
           </p>
           <button 
-            onClick={() => {
-              setIsLoading(true);
-              setError(null);
-              fetchHistory();
-            }}
+            onClick={onRefresh}
             className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95"
           >
             立即重試
@@ -112,7 +83,8 @@ CREATE TABLE IF NOT EXISTS tweets_history (
   language TEXT,
   tone TEXT,
   content JSONB,
-  date_range TEXT
+  date_range TEXT,
+  tweet_type TEXT
 );
 
 -- 2. 關閉 RLS 以允許前端存取 (或設定 Policy)
@@ -120,7 +92,7 @@ ALTER TABLE tweets_history DISABLE ROW LEVEL SECURITY;`}
                     </pre>
                     <button 
                       onClick={() => {
-                        const sql = `-- 1. 建立推文歷史資料表\nCREATE TABLE IF NOT EXISTS tweets_history (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  language TEXT,\n  tone TEXT,\n  content JSONB,\n  date_range TEXT\n);\n\n-- 2. 關閉 RLS 以允許前端存取 (或設定 Policy)\nALTER TABLE tweets_history DISABLE ROW LEVEL SECURITY;`;
+                        const sql = `-- 1. 建立推文歷史資料表\nCREATE TABLE IF NOT EXISTS tweets_history (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  language TEXT,\n  tone TEXT,\n  content JSONB,\n  date_range TEXT,\n  tweet_type TEXT\n);\n\n-- 2. 關閉 RLS 以允許前端存取 (或設定 Policy)\nALTER TABLE tweets_history DISABLE ROW LEVEL SECURITY;`;
                         navigator.clipboard.writeText(sql);
                         alert('SQL 已複製到剪貼簿！');
                       }}
@@ -145,7 +117,7 @@ ALTER TABLE tweets_history DISABLE ROW LEVEL SECURITY;`}
         <div className="flex flex-col gap-4 items-center">
           <div className="flex gap-4">
             <button 
-              onClick={() => fetchHistory()}
+              onClick={onRefresh}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
             >
               重新整理
@@ -215,6 +187,11 @@ ALTER TABLE tweets_history DISABLE ROW LEVEL SECURITY;`}
                       <span className="text-[10px] px-2 py-0.5 bg-blue-900/30 text-blue-400 rounded uppercase font-bold tracking-wider">
                         {item.language}
                       </span>
+                      {item.tweet_type && (
+                        <span className="text-[10px] px-2 py-0.5 bg-emerald-900/30 text-emerald-400 rounded uppercase font-bold tracking-wider">
+                          {item.tweet_type}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

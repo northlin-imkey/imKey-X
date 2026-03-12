@@ -1,25 +1,37 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
 import ResultsSection from './components/ResultsSection';
 import HistorySection from './components/HistorySection';
 import CelebrationTool from './components/CelebrationTool';
-import { DailyTweetGroup, Language, Tone } from './types';
-import { generateTweets, generateCelebrationTweets } from './services/geminiService';
+import Calendar from './components/Calendar';
+import { DailyTweetGroup, Language, Tone, TweetType, HistoryItem } from './types';
+import { generateTweets, generateCelebrationTweets, generateHotTopics } from './services/geminiService';
 
 const App: React.FC = () => {
   console.log('App component is rendering');
   const [view, setView] = useState<'generator' | 'history'>('generator');
   const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'error'>('checking');
   const [supabaseStatus, setSupabaseStatus] = useState<boolean>(false);
-
   const [serverError, setServerError] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
-  React.useEffect(() => {
+  const fetchHistory = useCallback(async () => {
+    try {
+      const response = await fetch('/backend/history');
+      if (response.ok) {
+        const data = await response.json();
+        setHistory(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch history:', err);
+    }
+  }, []);
+
+  useEffect(() => {
     const checkServer = async () => {
       try {
         const pingUrl = `/backend/ping?t=${Date.now()}`;
-        console.log(`Checking server at: ${pingUrl}`);
         const res = await fetch(pingUrl, { 
           method: 'GET',
           headers: { 
@@ -30,38 +42,26 @@ const App: React.FC = () => {
         
         if (!res.ok) {
           const text = await res.text();
-          console.error(`Server check failed [${res.status}]:`, text);
           throw new Error(`HTTP ${res.status}: ${text.substring(0, 100)}`);
         }
         
-        const contentType = res.headers.get('content-type') || '';
-        console.log(`Response status: ${res.status}, Content-Type: ${contentType}`);
-
-        if (!contentType.includes('application/json')) {
-          const text = await res.text();
-          console.error('Unexpected content type:', contentType, 'Body:', text);
-          throw new Error(`非 JSON 回應 (${contentType}): ${text.substring(0, 50)}`);
-        }
-        
         const data = await res.json();
-        console.log('Server check success:', data);
-        
         if (data.status === 'ok') {
           setServerStatus('ok');
           setSupabaseStatus(data.supabase);
+          fetchHistory();
         } else {
           setServerStatus('error');
           setServerError('伺服器回應格式錯誤');
         }
       } catch (err: any) {
-        console.error('Fetch error:', err);
         setServerStatus('error');
         setServerError(err.message || '無法連線至後端伺服器');
       }
     };
 
     checkServer();
-  }, []);
+  }, [fetchHistory]);
 
   const [pannewsImage, setPannewsImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -70,6 +70,7 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState<Language>('zh-CN');
   const [tone, setTone] = useState<Tone>('professional');
+  const [tweetType, setTweetType] = useState<TweetType>('educational');
 
   const handleImageChange = (file: File) => {
     setPannewsImage(file);
@@ -93,15 +94,35 @@ const App: React.FC = () => {
     setGeneratedTweets([]);
 
     try {
-      const tweets = await generateTweets(pannewsImage, language, tone);
+      const tweets = await generateTweets(pannewsImage, language, tone, tweetType);
       setGeneratedTweets(tweets);
+      fetchHistory();
     } catch (err) {
       console.error(err);
       setError('推文生成失敗，請檢查您的網路連線、圖片格式或稍後再試。');
     } finally {
       setIsLoading(false);
     }
-  }, [pannewsImage, isLoading, language, tone]);
+  }, [pannewsImage, isLoading, language, tone, tweetType, fetchHistory]);
+
+  const handleGenerateHotTopics = async () => {
+    if (isLoading) return;
+
+    setIsLoading(true);
+    setError(null);
+    setGeneratedTweets([]);
+
+    try {
+      const tweets = await generateHotTopics(language, tone);
+      setGeneratedTweets(tweets);
+      fetchHistory();
+    } catch (err) {
+      console.error(err);
+      setError('時事推文生成失敗，請稍後再試。');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCelebrationGenerate = async (asset: string, price: string) => {
     if (isLoading) return;
@@ -113,6 +134,7 @@ const App: React.FC = () => {
     try {
       const tweets = await generateCelebrationTweets(asset, price, language, tone);
       setGeneratedTweets(tweets);
+      fetchHistory();
     } catch (err) {
       console.error(err);
       setError('祝賀推文生成失敗，請稍後再試。');
@@ -126,30 +148,41 @@ const App: React.FC = () => {
       <Header />
       
       <div className="container mx-auto px-4 md:px-8 mt-6">
-        <div className="flex bg-gray-800 p-1 rounded-xl w-fit border border-gray-700">
-          <button
-            onClick={() => setView('generator')}
-            className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
-              view === 'generator' 
-                ? 'bg-emerald-600 text-white shadow-lg' 
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            推文產生器
-          </button>
-          <button
-            onClick={() => setView('history')}
-            className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
-              view === 'history' 
-                ? 'bg-emerald-600 text-white shadow-lg' 
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            歷史紀錄
-          </button>
+        <div className="flex items-center justify-between">
+          <div className="flex bg-gray-800 p-1 rounded-xl w-fit border border-gray-700">
+            <button
+              onClick={() => setView('generator')}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                view === 'generator' 
+                  ? 'bg-emerald-600 text-white shadow-lg' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              推文產生器
+            </button>
+            <button
+              onClick={() => setView('history')}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                view === 'history' 
+                  ? 'bg-emerald-600 text-white shadow-lg' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              歷史紀錄
+            </button>
+          </div>
+          
+          {serverStatus === 'ok' && (
+            <div className="hidden md:block">
+              <div className="flex items-center gap-2 text-[10px] text-gray-500 bg-gray-800/50 px-3 py-1.5 rounded-full border border-gray-700">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                伺服器連線正常
+              </div>
+            </div>
+          )}
         </div>
         
-        {serverStatus !== 'ok' ? (
+        {serverStatus !== 'ok' && (
           <div className="mt-4 flex justify-center">
             <div className={`text-xs px-3 py-1 rounded-full border ${
               serverStatus === 'checking' 
@@ -187,36 +220,34 @@ const App: React.FC = () => {
               )}
             </div>
           </div>
-        ) : !supabaseStatus && (
-          <div className="mt-4 flex justify-center">
-            <div className="text-xs px-3 py-1 rounded-full border bg-red-500/10 border-red-500/30 text-red-400">
-              Supabase 未設定，歷史紀錄功能將無法使用
-            </div>
-          </div>
         )}
       </div>
 
       <main className="flex-grow container mx-auto p-4 md:p-8">
         {view === 'generator' ? (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              <div className="lg:col-span-1 space-y-6">
+                <Calendar history={history} />
                 <CelebrationTool 
                   onGenerate={handleCelebrationGenerate} 
                   isLoading={isLoading} 
                 />
               </div>
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-3">
                 <InputSection
                   onImageChange={handleImageChange}
                   onImageRemove={handleImageRemove}
                   imagePreview={imagePreview}
                   onGenerate={handleGenerate}
+                  onGenerateHotTopics={handleGenerateHotTopics}
                   isLoading={isLoading}
                   language={language}
                   onLanguageChange={setLanguage}
                   tone={tone}
                   onToneChange={setTone}
+                  tweetType={tweetType}
+                  onTweetTypeChange={setTweetType}
                 />
               </div>
             </div>
@@ -228,7 +259,12 @@ const App: React.FC = () => {
             />
           </div>
         ) : (
-          <HistorySection />
+          <HistorySection 
+            history={history} 
+            isLoading={isLoading && view === 'history'} 
+            error={null} 
+            onRefresh={fetchHistory} 
+          />
         )}
       </main>
       <footer className="text-center p-4 text-gray-500 text-sm">

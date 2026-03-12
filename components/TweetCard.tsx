@@ -49,6 +49,22 @@ const TweetCard: React.FC<TweetCardProps> = ({ tweet, onStatusChange }) => {
       <div className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div className="flex-1">
           <p className="text-gray-200 whitespace-pre-wrap text-lg leading-relaxed">{tweet.tweetText}</p>
+          
+          {tweet.pollOptions && tweet.pollOptions.length > 0 && (
+            <div className="mt-4 space-y-2 max-w-md">
+              <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                <div className="w-1 h-1 bg-blue-400 rounded-full"></div>
+                Poll Options
+              </div>
+              {tweet.pollOptions.map((option, idx) => (
+                <div key={idx} className="w-full p-2 bg-blue-900/20 border border-blue-500/30 rounded-lg text-sm text-blue-200 flex items-center justify-between">
+                  <span>{option}</span>
+                  <div className="w-4 h-4 rounded-full border border-blue-500/50"></div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2 mt-3">
             {tweet.hashtags.map((tag, i) => (
               <span key={i} className="px-3 py-1 bg-blue-900/50 text-blue-300 text-sm font-medium rounded-full">

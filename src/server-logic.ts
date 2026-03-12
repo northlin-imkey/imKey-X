@@ -37,9 +37,20 @@ apiRouter.post("/save-history", async (req, res) => {
   if (!supabaseClient) return res.status(503).json({ error: "Supabase not configured" });
   try {
     const { data, error } = await supabaseClient.from("tweets_history").insert([req.body]).select();
-    if (error) throw error;
+    if (error) {
+      // If the error is about a missing column, try to insert without that column
+      if (error.message.includes("Could not find the 'tweet_type' column")) {
+        console.warn("[API] tweet_type column missing, retrying without it");
+        const { tweet_type, ...rest } = req.body;
+        const { data: retryData, error: retryError } = await supabaseClient.from("tweets_history").insert([rest]).select();
+        if (retryError) throw retryError;
+        return res.json({ success: true, id: retryData?.[0]?.id, warning: "tweet_type column missing in DB" });
+      }
+      throw error;
+    }
     res.json({ success: true, id: data?.[0]?.id });
   } catch (err: any) {
+    console.error("[API] Save history error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
