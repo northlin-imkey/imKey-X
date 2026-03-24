@@ -15,6 +15,7 @@ apiRouter.get("/ping", (req, res) => {
   res.json({ 
     status: "ok", 
     supabase: !!getSupabase(),
+    gemini: !!process.env.GEMINI_API_KEY,
     env: process.env.NODE_ENV,
     time: new Date().toISOString()
   });

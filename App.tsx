@@ -13,19 +13,30 @@ const App: React.FC = () => {
   const [view, setView] = useState<'generator' | 'history'>('generator');
   const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'error'>('checking');
   const [supabaseStatus, setSupabaseStatus] = useState<boolean>(false);
+  const [geminiStatus, setGeminiStatus] = useState<boolean>(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
     try {
       const response = await fetch(`/backend/history?t=${Date.now()}`);
       if (response.ok) {
         const data = await response.json();
         console.log('[App] History fetched:', data.length, 'items');
         setHistory(data);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setHistoryError(errorData.error || `伺服器錯誤 (${response.status})`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch history:', err);
+      setHistoryError(err.message || '無法連線至資料庫');
+    } finally {
+      setHistoryLoading(false);
     }
   }, []);
 
@@ -50,6 +61,7 @@ const App: React.FC = () => {
         if (data.status === 'ok') {
           setServerStatus('ok');
           setSupabaseStatus(data.supabase);
+          setGeminiStatus(data.gemini);
           fetchHistory();
         } else {
           setServerStatus('error');
@@ -98,9 +110,9 @@ const App: React.FC = () => {
       const tweets = await generateTweets(pannewsImage, language, tone, tweetType);
       setGeneratedTweets(tweets);
       fetchHistory();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('推文生成失敗，請檢查您的網路連線、圖片格式或稍後再試。');
+      setError(`推文生成失敗: ${err.message || '請檢查您的網路連線、圖片格式或稍後再試。'}`);
     } finally {
       setIsLoading(false);
     }
@@ -173,14 +185,24 @@ const App: React.FC = () => {
             </button>
           </div>
           
-          {serverStatus === 'ok' && (
-            <div className="hidden md:block">
-              <div className="flex items-center gap-2 text-[10px] text-gray-500 bg-gray-800/50 px-3 py-1.5 rounded-full border border-gray-700">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                伺服器連線正常
+          <div className="flex items-center gap-4">
+            {serverStatus === 'ok' && (
+              <div className="hidden md:flex items-center gap-4">
+                <div className="flex items-center gap-2 text-[10px] text-gray-500 bg-gray-800/50 px-3 py-1.5 rounded-full border border-gray-700">
+                  <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${geminiStatus ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                  AI 服務: {geminiStatus ? '正常' : '未設定'}
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-gray-500 bg-gray-800/50 px-3 py-1.5 rounded-full border border-gray-700">
+                  <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${supabaseStatus ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                  資料庫: {supabaseStatus ? '連線正常' : '連線失敗'}
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-gray-500 bg-gray-800/50 px-3 py-1.5 rounded-full border border-gray-700">
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                  伺服器連線正常
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         
         {serverStatus !== 'ok' && (
@@ -262,8 +284,8 @@ const App: React.FC = () => {
         ) : (
           <HistorySection 
             history={history} 
-            isLoading={isLoading && view === 'history'} 
-            error={null} 
+            isLoading={historyLoading} 
+            error={historyError} 
             onRefresh={fetchHistory} 
           />
         )}
